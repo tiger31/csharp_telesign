@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using Newtonsoft.Json.Linq;
-using System.Security.Cryptography;
 using System.Net;
-using Newtonsoft.Json;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace Telesign
 {
+    using Strategy;
+
     /// <summary>
     /// The TeleSign RestClient is a generic HTTP REST client that can be extended to make requests against any of
     /// TeleSign's REST API endpoints.
@@ -19,16 +19,40 @@ namespace Telesign
     /// </summary>
     public class RestClient : IDisposable
     {
-        public static readonly string UserAgent = string.Format("TeleSignSdk/csharp-{0} .Net/{1} HttpClient",
-            "2.2.2",
-            Environment.Version.ToString());
+        /// <summary>
+        /// Default Telesign User-Agent header 
+        /// </summary>
+        public static readonly string UserAgent =
+            $"TeleSignSdk/csharp-2.2.2 .Net/{Environment.Version} HttpClient";
 
-        protected string customerId;
-        protected string apiKey;
-        protected string restEndpoint;
-        protected HttpClient httpClient;
+        /// <summary>
+        /// Telesign customerId
+        /// </summary>
+        protected readonly string CustomerId;
 
-        bool disposed = false;
+        /// <summary>
+        /// Telesign apiKey (secretKey)
+        /// </summary>
+        protected readonly string ApiKey;
+
+        /// <summary>
+        /// URI to Telesign API location
+        /// </summary>
+        protected readonly string RestEndpoint;
+
+
+        /// <summary>
+        /// Default http client
+        /// </summary>
+        protected readonly HttpClient HttpClient;
+
+
+        /// <summary>
+        /// Strategy that provides method to generates TeleSign REST API headers used to authenticate requests
+        /// </summary>
+        protected IHeadersStrategy Strategy;
+
+        private bool _disposed;
 
         /// <summary>
         /// TeleSign RestClient useful for making generic RESTful requests against our API.
@@ -36,6 +60,7 @@ namespace Telesign
         /// <param name="customerId">Your customer_id string associated with your account.</param>
         /// <param name="apiKey">Your api_key string associated with your account.</param>
         /// <param name="restEndpoint">Override the default restEndpoint to target another endpoint.</param>
+        /// <param name="strategy">Method used to generates TeleSign REST API headers used to authenticate requests</param>
         /// <param name="timeout">The timeout passed into HttpClient.</param>
         /// <param name="proxy">The proxy passed into HttpClient.</param>
         /// <param name="proxyUsername">The username passed into HttpClient.</param>
@@ -44,32 +69,40 @@ namespace Telesign
                           string apiKey,
                           string restEndpoint = "https://rest-api.telesign.com",
                           int timeout = 10,
-                          WebProxy proxy = null,
+                          IWebProxy proxy = null,
                           string proxyUsername = null,
-                          string proxyPassword = null)
+                          string proxyPassword = null,
+                          IHeadersStrategy strategy = null)
         {
-            this.customerId = customerId;
-            this.apiKey = apiKey;
-            this.restEndpoint = restEndpoint;
+            this.CustomerId = customerId;
+            this.ApiKey = apiKey;
+            this.RestEndpoint = restEndpoint;
+
+            if (strategy == null)
+            {
+                this.Strategy = new TelesignHeaderStrategy();
+            }
 
             if (proxy == null)
             {
-                this.httpClient = new HttpClient();
+                this.HttpClient = new HttpClient();
             }
             else
             {
-                HttpClientHandler httpClientHandler = new HttpClientHandler();
-                httpClientHandler.Proxy = proxy;
+                var httpClientHandler = new HttpClientHandler
+                {
+                    Proxy = proxy
+                };
 
                 if (proxyUsername != null && proxyPassword != null)
                 {
                     httpClientHandler.Credentials = new NetworkCredential(proxyUsername, proxyPassword);
                 }
 
-                this.httpClient = new HttpClient(httpClientHandler);
+                this.HttpClient = new HttpClient(httpClientHandler);
             }
 
-            this.httpClient.Timeout = TimeSpan.FromSeconds(timeout);
+            this.HttpClient.Timeout = TimeSpan.FromSeconds(timeout);
         }
 
         public void Dispose()
@@ -78,13 +111,22 @@ namespace Telesign
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Sets header generation strategy
+        /// </summary>
+        /// <param name="strategy">Header strategy</param>
+        public void SetHeaderStrategy(IHeadersStrategy strategy)
+        {
+            this.Strategy = strategy;
+        }
+
         protected virtual void Dispose(bool disposing)
         {
-            if (disposed)
+            if (_disposed)
                 return;
 
-            this.httpClient.Dispose();
-            disposed = true;
+            this.HttpClient.Dispose();
+            _disposed = true;
         }
 
         /// <summary>
@@ -94,6 +136,11 @@ namespace Telesign
         {
             private Task<string> BodyTask;
             
+            /// <summary>
+            /// Telesign response object
+            /// </summary>
+            /// <param name="response"></param>
+            /// <param name="isAsync"></param>
             public TelesignResponse(HttpResponseMessage response, bool isAsync = false)
             {
                 this.StatusCode = (int)response.StatusCode;
@@ -120,6 +167,9 @@ namespace Telesign
                 
             }
 
+            /// <summary>
+            /// Asynchronously parses response body into Json property
+            /// </summary>
             public async Task Initialize()
             {
                 this.Body = await BodyTask.ConfigureAwait(false) ;
@@ -131,7 +181,6 @@ namespace Telesign
                 {
                     this.Json = new JObject();
                 }
-                
             }
 
             public int StatusCode { get; set; }
@@ -139,96 +188,6 @@ namespace Telesign
             public string Body { get; set; }
             public JObject Json { get; set; }
             public bool OK { get; set; }
-        }
-
-        /// <summary>
-        /// Generates the TeleSign REST API headers used to authenticate requests.
-        ///
-        /// Creates the canonicalized stringToSign and generates the HMAC signature.This is used to authenticate requests
-        /// against the TeleSign REST API.
-        ///
-        /// See https://developer.telesign.com/docs/authentication for detailed API documentation.
-        /// </summary>
-        /// <param name="customerId">Your account customer_id.</param>
-        /// <param name="apiKey">Your account api_key.</param>
-        /// <param name="methodName">The HTTP method name of the request as a upper case string, should be one of 'POST', 'GET', 'PUT' or 'DELETE'.</param>
-        /// <param name="resource">The partial resource URI to perform the request against.</param>
-        /// <param name="urlEncodedFields">URL encoded HTTP body to perform the HTTP request with.</param>
-        /// <param name="dateRfc2616">The date and time of the request formatted in rfc 2616.</param>
-        /// <param name="nonce">A unique cryptographic nonce for the request.</param>
-        /// <param name="userAgent">User Agent associated with the request.</param>
-        /// <param name="contentType">Content type of the request.</param>
-        /// <returns>A dictionary of HTTP headers to be applied to the request.</returns>
-        public static Dictionary<string, string> GenerateTelesignHeaders(string customerId,
-                                                                         string apiKey,
-                                                                         string methodName,
-                                                                         string resource,
-                                                                         string urlEncodedFields,
-                                                                         string dateRfc2616,
-                                                                         string nonce,
-                                                                         string userAgent,
-                                                                         string contentType = null)
-        {
-            if (dateRfc2616 == null)
-            {
-                dateRfc2616 = DateTime.UtcNow.ToString("r");
-            }
-
-            if (nonce == null)
-            {
-                nonce = Guid.NewGuid().ToString();
-            }
-
-            if (contentType == null)
-            {
-                if (methodName == "POST" || methodName == "PUT")
-                    contentType = "application/x-www-form-urlencoded";
-                else
-                    contentType = "";
-            }
-
-            string authMethod = "HMAC-SHA256";
-
-            StringBuilder stringToSignBuilder = new StringBuilder();
-
-            stringToSignBuilder.Append(string.Format("{0}", methodName));
-
-            stringToSignBuilder.Append(string.Format("\n{0}", contentType));
-
-            stringToSignBuilder.Append(string.Format("\n{0}", dateRfc2616));
-
-            stringToSignBuilder.Append(string.Format("\nx-ts-auth-method:{0}", authMethod));
-
-            stringToSignBuilder.Append(string.Format("\nx-ts-nonce:{0}", nonce));
-
-            if (!string.IsNullOrEmpty(contentType) && !string.IsNullOrEmpty(urlEncodedFields))
-            {
-                stringToSignBuilder.Append(string.Format("\n{0}", urlEncodedFields));
-            }
-
-            stringToSignBuilder.Append(string.Format("\n{0}", resource));
-
-            string stringToSign = stringToSignBuilder.ToString();
-
-            HMAC hasher = new HMACSHA256(Convert.FromBase64String(apiKey));
-            string signature = Convert.ToBase64String(hasher.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
-
-            string authorization = string.Format("TSA {0}:{1}", customerId, signature);
-
-            Dictionary<string, string> headers = new Dictionary<string, string>();
-
-            headers.Add("Authorization", authorization);
-            headers.Add("Date", dateRfc2616);
-            headers.Add("Content-Type", contentType);
-            headers.Add("x-ts-auth-method", authMethod);
-            headers.Add("x-ts-nonce", nonce);
-
-            if (userAgent != null)
-            {
-                headers.Add("User-Agent", userAgent);
-            }
-
-            return headers;
         }
 
         /// <summary>
@@ -339,26 +298,30 @@ namespace Telesign
                 parameters = new Dictionary<string, string>();
             }
 
-            string resourceUri = string.Format("{0}{1}", this.restEndpoint, resource);
+            var resourceUri = $"{this.RestEndpoint}{resource}";
 
-            FormUrlEncodedContent formBody = new FormUrlEncodedContent(parameters);
-            string urlEncodedFields = await formBody.ReadAsStringAsync().ConfigureAwait(false);
+            var formBody = new FormUrlEncodedContent(parameters);
+            var urlEncodedFields = await formBody.ReadAsStringAsync().ConfigureAwait(false);
 
             HttpRequestMessage request;
             if (method == HttpMethod.Post || method == HttpMethod.Put)
             {
-                request = new HttpRequestMessage(method, resourceUri);
-                request.Content = formBody;
+                request = new HttpRequestMessage(method, resourceUri)
+                {
+                    Content = formBody
+                };
             }
             else
             {
-                UriBuilder resourceUriWithQuery = new UriBuilder(resourceUri);
-                resourceUriWithQuery.Query = urlEncodedFields;
+                var resourceUriWithQuery = new UriBuilder(resourceUri)
+                {
+                    Query = urlEncodedFields
+                };
                 request = new HttpRequestMessage(method, resourceUriWithQuery.ToString());
             }
 
-            Dictionary<string, string> headers = GenerateTelesignHeaders(this.customerId,
-                                                                         this.apiKey,
+            var headers = this.Strategy.GenerateHeaders(this.CustomerId,
+                                                                         this.ApiKey,
                                                                          method.ToString().ToUpper(),
                                                                          resource,
                                                                          urlEncodedFields,
@@ -366,7 +329,7 @@ namespace Telesign
                                                                          null,
                                                                          RestClient.UserAgent);
 
-            foreach (KeyValuePair<string, string> header in headers)
+            foreach (var header in headers)
             {
                 if (header.Key == "Content-Type")
                     // skip Content-Type, otherwise HttpClient will complain
@@ -375,9 +338,9 @@ namespace Telesign
                 request.Headers.Add(header.Key, header.Value);
             }
 
-            HttpResponseMessage response = await this.httpClient.SendAsync(request).ConfigureAwait(false);
+            var response = await this.HttpClient.SendAsync(request).ConfigureAwait(false);
 
-            TelesignResponse tsResponse = new TelesignResponse(response, isAsync: true);
+            var tsResponse = new TelesignResponse(response, true);
             await tsResponse.Initialize();
             return tsResponse;
         }

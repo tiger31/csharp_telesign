@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 
 namespace Telesign
 {
+    using Strategy;
+
     /// <summary>
     /// A set of APIs that deliver deep phone number data attributes that help optimize the end user
     /// verification process and evaluate risk.
@@ -35,14 +37,16 @@ namespace Telesign
                                 int timeout,
                                 WebProxy proxy,
                                 string proxyUsername,
-                                string proxyPassword)
+                                string proxyPassword,
+                                IHeadersStrategy strategy)
             : base(customerId,
                    apiKey,
                    restEndPoint,
                    timeout,
                    proxy,
                    proxyUsername,
-                   proxyPassword)
+                   proxyPassword,
+                   strategy)
         { }
 
         /// <summary>
@@ -65,16 +69,16 @@ namespace Telesign
             if (parameters == null)
                 parameters = new Dictionary<string, object>();
 
-            string resourceUri = string.Format("{0}{1}", this.restEndpoint, resource);
+            string resourceUri = string.Format("{0}{1}", this.RestEndpoint, resource);
 
             fieldsToSign = JsonConvert.SerializeObject(parameters);
             request = new HttpRequestMessage(method, resourceUri);
             request.Content = new StringContent(fieldsToSign);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
 
-            Dictionary<string, string> headers = RestClient.GenerateTelesignHeaders(
-                this.customerId,
-                this.apiKey,
+            Dictionary<string, string> headers = this.Strategy.GenerateHeaders(
+                this.CustomerId,
+                this.ApiKey,
                 method.ToString().ToUpper(),
                 resource,
                 fieldsToSign,
@@ -93,7 +97,7 @@ namespace Telesign
                 request.Headers.Add(header.Key, header.Value);
             }
 
-            HttpResponseMessage response = await this.httpClient.SendAsync(request).ConfigureAwait(false);
+            HttpResponseMessage response = await this.HttpClient.SendAsync(request).ConfigureAwait(false);
 
             TelesignResponse tsResponse = new TelesignResponse(response, isAsync: true);
             await tsResponse.Initialize();

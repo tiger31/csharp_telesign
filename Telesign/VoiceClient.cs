@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 
 namespace Telesign
 {
+    using Strategy;
+
     /// <summary>
     ///  TeleSign's Voice API allows you to easily send voice messages. You can send alerts, reminders, and notifications,
     /// or you can send verification messages containing time-based, one-time passcodes(TOTP).
@@ -33,14 +35,16 @@ namespace Telesign
                                 int timeout,
                                 WebProxy proxy,
                                 string proxyUsername,
-                                string proxyPassword)
+                                string proxyPassword,
+                                IHeadersStrategy strategy)
             : base(customerId,
                    apiKey,
                    restEndPoint,
                    timeout,
                    proxy,
                    proxyUsername,
-                   proxyPassword)
+                   proxyPassword,
+                   strategy)
         { }
 
         /// <summary>

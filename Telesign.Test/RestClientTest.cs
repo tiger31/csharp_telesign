@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 
 namespace Telesign.Test
 {
+    using Strategy;
+
     [TestFixture]
     [ExcludeFromCodeCoverage]
     public class RestClientTest : IDisposable
@@ -22,6 +24,8 @@ namespace Telesign.Test
         private List<string> requestBodies;
         private List<Dictionary<string, string>> requestHeaders;
 
+        private IHeadersStrategy telesignHeadersStrategy;
+
         bool disposed = false;
 
         [SetUp]
@@ -33,6 +37,8 @@ namespace Telesign.Test
             this.requests = new List<HttpListenerRequest>();
             this.requestBodies = new List<string>();
             this.requestHeaders = new List<Dictionary<string, string>>();
+
+            this.telesignHeadersStrategy = new TelesignHeaderStrategy();
 
             this.mockServer = new MockServer(0, "/test/resource", (req, rsp, prm) =>
             {
@@ -92,7 +98,7 @@ namespace Telesign.Test
             string expectedAuthorizationHeader = "TSA FFFFFFFF-EEEE-DDDD-1234-AB1234567890:" +
                 "2xVlmbrxLjYrrPun3G3WMNG6Jon4yKcTeOoK9DjXJ/Q=";
 
-            Dictionary<string, string> actualHeaders = RestClient.GenerateTelesignHeaders(this.customerId,
+            Dictionary<string, string> actualHeaders = this.telesignHeadersStrategy.GenerateHeaders(this.customerId,
                 this.apiKey,
                 methodName,
                 resource,
@@ -119,7 +125,7 @@ namespace Telesign.Test
             string expectedAuthorizationHeader = "TSA FFFFFFFF-EEEE-DDDD-1234-AB1234567890:" +
                 "h8d4I0RTxErbxYXuzCOtNqb/f0w3Ck8e5SEkGNj01+8=";
 
-            Dictionary<string, string> actualHeaders = RestClient.GenerateTelesignHeaders(this.customerId,
+            Dictionary<string, string> actualHeaders = this.telesignHeadersStrategy.GenerateHeaders(this.customerId,
                 this.apiKey,
                 methodName,
                 resource,
@@ -146,7 +152,7 @@ namespace Telesign.Test
             string expectedAuthorizationHeader = "TSA FFFFFFFF-EEEE-DDDD-1234-AB1234567890:" +
                 "aUm7I+9GKl3ww7PNeeJntCT0iS7b+EmRKEE4LnRzChQ=";
 
-            Dictionary<string, string> actualHeaders = RestClient.GenerateTelesignHeaders(this.customerId,
+            Dictionary<string, string> actualHeaders = this.telesignHeadersStrategy.GenerateHeaders(this.customerId,
                 this.apiKey,
                 methodName,
                 resource,
@@ -167,7 +173,7 @@ namespace Telesign.Test
             string methodName = "GET";
             string resource = "/v1/resource";
 
-            Dictionary<string, string> actualHeaders = RestClient.GenerateTelesignHeaders(this.customerId,
+            Dictionary<string, string> actualHeaders = this.telesignHeadersStrategy.GenerateHeaders(this.customerId,
                 this.apiKey,
                 methodName,
                 resource,

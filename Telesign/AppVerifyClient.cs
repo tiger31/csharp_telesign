@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 
 namespace Telesign
 {
+    using Strategy;
+
     /// <summary>
     ///  AppVerify is a secure, lightweight SDK that integrates a frictionless user verification process into existing native mobile applications.
     /// </summary>
@@ -31,14 +33,16 @@ namespace Telesign
                                 int timeout,
                                 WebProxy proxy,
                                 string proxyUsername,
-                                string proxyPassword)
+                                string proxyPassword,
+                                IHeadersStrategy strategy)
             : base(customerId,
                    apiKey,
                    restEndPoint,
                    timeout,
                    proxy,
                    proxyUsername,
-                   proxyPassword)
+                   proxyPassword,
+                   strategy)
         {
         }
 

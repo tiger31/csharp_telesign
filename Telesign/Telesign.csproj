@@ -70,6 +70,8 @@
     <Compile Include="PhoneIdClient.cs" />
     <Compile Include="ScoreClient.cs" />
     <Compile Include="RestClient.cs" />
+    <Compile Include="Strategy\IHeadersStrategy.cs" />
+    <Compile Include="Strategy\TelesignHeaderStrategy.cs" />
     <Compile Include="VoiceClient.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -88,6 +90,7 @@
     <None Include="packages.config" />
     <None Include="telesign.nuspec" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

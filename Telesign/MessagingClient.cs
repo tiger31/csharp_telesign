@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 
 namespace Telesign
 {
+    using Strategy;
+
     /// <summary>
     ///  TeleSign's Messaging API allows you to easily send SMS messages. You can send alerts, reminders, and notifications,
     ///  or you can send verification messages containing one-time passcodes(OTP).
@@ -33,14 +35,16 @@ namespace Telesign
                                 int timeout,
                                 WebProxy proxy,
                                 string proxyUsername,
-                                string proxyPassword)
+                                string proxyPassword,
+                                IHeadersStrategy strategy)
             : base(customerId,
                    apiKey,
                    restEndPoint,
                    timeout,
                    proxy,
                    proxyUsername,
-                   proxyPassword)
+                   proxyPassword,
+                   strategy)
         { }
 
         /// <summary>
