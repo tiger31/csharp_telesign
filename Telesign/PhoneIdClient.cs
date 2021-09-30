@@ -35,10 +35,10 @@ namespace Telesign
                                 string apiKey,
                                 string restEndPoint,
                                 int timeout,
-                                WebProxy proxy,
+                                IWebProxy proxy,
                                 string proxyUsername,
                                 string proxyPassword,
-                                IHeadersStrategy strategy)
+                                IHeadersStrategy strategy = null)
             : base(customerId,
                    apiKey,
                    restEndPoint,
