@@ -78,10 +78,7 @@ namespace Telesign
             this.ApiKey = apiKey;
             this.RestEndpoint = restEndpoint;
 
-            if (strategy == null)
-            {
-                this.Strategy = new TelesignHeaderStrategy();
-            }
+            this.Strategy = strategy ?? new TelesignHeaderStrategy();
 
             if (proxy == null)
             {
