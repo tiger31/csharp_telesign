@@ -38,7 +38,8 @@ namespace Telesign
                                 IWebProxy proxy,
                                 string proxyUsername,
                                 string proxyPassword,
-                                IHeadersStrategy strategy = null)
+                                IHeadersStrategy strategy = null,
+                                HttpClient client = null)
             : base(customerId,
                    apiKey,
                    restEndPoint,
@@ -46,7 +47,8 @@ namespace Telesign
                    proxy,
                    proxyUsername,
                    proxyPassword,
-                   strategy)
+                   strategy,
+                   client)
         { }
 
         /// <summary>

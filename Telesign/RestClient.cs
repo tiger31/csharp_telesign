@@ -60,11 +60,12 @@ namespace Telesign
         /// <param name="customerId">Your customer_id string associated with your account.</param>
         /// <param name="apiKey">Your api_key string associated with your account.</param>
         /// <param name="restEndpoint">Override the default restEndpoint to target another endpoint.</param>
-        /// <param name="strategy">Method used to generates TeleSign REST API headers used to authenticate requests</param>
-        /// <param name="timeout">The timeout passed into HttpClient.</param>
+        /// <param name="timeout">The timeout in seconds passed into HttpClient.</param>
         /// <param name="proxy">The proxy passed into HttpClient.</param>
         /// <param name="proxyUsername">The username passed into HttpClient.</param>
         /// <param name="proxyPassword">The password passed into HttpClient.</param>
+        /// <param name="strategy">Method used to generates TeleSign REST API headers used to authenticate requests</param>
+        /// <param name="client">Instance of HttpClient. Allows it to be injected from IHttpClientFactory</param>
         public RestClient(string customerId,
                           string apiKey,
                           string restEndpoint = "https://rest-api.telesign.com",
@@ -72,13 +73,19 @@ namespace Telesign
                           IWebProxy proxy = null,
                           string proxyUsername = null,
                           string proxyPassword = null,
-                          IHeadersStrategy strategy = null)
+                          IHeadersStrategy strategy = null,
+                          HttpClient client = null)
         {
             this.CustomerId = customerId;
             this.ApiKey = apiKey;
             this.RestEndpoint = restEndpoint;
 
             this.Strategy = strategy ?? new TelesignHeaderStrategy();
+
+            if (client != null)
+            {
+                this.HttpClient = client;
+            }
 
             if (proxy == null)
             {
